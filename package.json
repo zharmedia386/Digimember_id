@@ -1,0 +1,39 @@
+{
+  "name": "Digimember_WA_Bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "nodemonConfig": {
+    "ignore": [
+      "auth/*"
+    ]
+  },
+  "devDependencies": {
+    "@types/firebase": "^3.2.1",
+    "@types/node": "^18.14.0",
+    "typescript": "^4.9.5"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@adiwajshing/baileys": "^5.0.0",
+    "@hapi/boom": "^10.0.1",
+    "body-parser": "^1.20.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "exceljs": "^4.3.0",
+    "express": "^4.18.2",
+    "firebase": "^9.17.1",
+    "jimp": "^0.22.4",
+    "mime-types": "^2.1.35",
+    "nodemon": "^2.0.20",
+    "pdf-lib": "^1.17.1",
+    "qrcode-terminal": "^0.12.0",
+    "ts-node": "^10.9.1"
+  }
+}
