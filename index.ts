@@ -1,4 +1,4 @@
-import makeWASocket, { DisconnectReason, useMultiFileAuthState, MessageType, downloadMediaMessage   } from '@adiwajshing/baileys'
+import makeWASocket, { DisconnectReason, useMultiFileAuthState, MessageType, downloadMediaMessage   } from '@whiskeysockets/baileys'
 import { Boom } from '@hapi/boom'
 import { writeFile, readFile } from 'fs/promises'
 import Jimp from "jimp";
@@ -107,11 +107,11 @@ async function connectToWhatsApp () {
                 namaLengkap = msg.message!.conversation?.split('Nomor Anggota:')[0];
                 namaLengkap = namaLengkap.replace('Nama Lengkap: ','').replace(/(?:\r\n|\r|\n)/g, '');
                 
-                nomorAnggota = msg.message!.conversation?.split('Waktu Validitas: ')[0];
+                nomorAnggota = msg.message!.conversation?.split('Waktu Validitas:')[0];
                 nomorAnggota = nomorAnggota.split('Nomor Anggota: ')[1];
                 nomorAnggota = nomorAnggota.replace('Nomor Anggota: ','').replace(/(?:\r\n|\r|\n)/g, '');
-
-                waktuValiditas = msg.message!.conversation?.split('Waktu Validitas: ')[1];
+                
+                waktuValiditas = msg.message!.conversation?.split('Waktu Validitas:')[1];
                 waktuValiditas = waktuValiditas.replace('Waktu Validitas: ','').replace(/(?:\r\n|\r|\n)/g, '');
 
                 status = 'registered';
