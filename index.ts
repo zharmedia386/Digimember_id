@@ -79,6 +79,9 @@ async function connectToWhatsApp () {
         let NOMOR_ADMIN = '6289668741500' // EDIT NOMOR ADMIN HERE!!
         NOMOR_ADMIN += '@s.whatsapp.net'
 
+        // Determine whether the message is a personal or group message
+        let currentMessage = msg.message?.extendedTextMessage?.text ? msg.message?.extendedTextMessage?.text : msg.message!.conversation;
+
         let nomorAnggota = '';
         let namaLengkap = '';
         let waktuValiditas = '';
@@ -87,8 +90,6 @@ async function connectToWhatsApp () {
         let nomorAnggotaFromFirebase = '';
         let namaLengkapFromFirebase = '';
         let waktuValiditasFromFirebase = '';
-
-        let responseButton = msg.message.buttonsResponseMessage;
 
         if(userData) {
             status = userData.status;
@@ -102,17 +103,22 @@ async function connectToWhatsApp () {
         }
 
         if(!msg.key.fromMe && m.type === 'notify') {
-            if(msg.message!.conversation?.includes('Nama Lengkap: ') && msg.message!.conversation?.includes('Nomor Anggota:') && msg.message!.conversation?.includes('Waktu Validitas:')){
+            if(currentMessage.includes('Nama Lengkap: ') && currentMessage.includes('Nomor Anggota:') && currentMessage.includes('Waktu Validitas:')){
                 // Get only the value of namaLengkap, nomorAnggota, waktuValiditas
-                namaLengkap = msg.message!.conversation?.split('Nomor Anggota:')[0];
-                namaLengkap = namaLengkap.replace('Nama Lengkap: ','').replace(/(?:\r\n|\r|\n)/g, '');
+                const namaLengkapRegex = /Nama Lengkap: ([^\n]+)/;
+                const namaLengkapMatch = currentMessage.match(namaLengkapRegex);
+                namaLengkap = namaLengkapMatch ? namaLengkapMatch[1] : '';
+
+                const nomorAnggotaRegex = /Nomor Anggota: (\d+)/;
+                const nomorAnggotaMatch = currentMessage.match(nomorAnggotaRegex);
+                nomorAnggota = nomorAnggotaMatch ? nomorAnggotaMatch[1] : '';
                 
-                nomorAnggota = msg.message!.conversation?.split('Waktu Validitas:')[0];
-                nomorAnggota = nomorAnggota.split('Nomor Anggota: ')[1];
-                nomorAnggota = nomorAnggota.replace('Nomor Anggota: ','').replace(/(?:\r\n|\r|\n)/g, '');
-                
-                waktuValiditas = msg.message!.conversation?.split('Waktu Validitas:')[1];
-                waktuValiditas = waktuValiditas.replace('Waktu Validitas: ','').replace(/(?:\r\n|\r|\n)/g, '');
+                waktuValiditas = currentMessage.split('Nomor Anggota: ')[1];
+                waktuValiditas = waktuValiditas.replace(/(?:\r\n|\r|\n)/g, '');
+                const waktuValiditasRegex = /Waktu Validitas:\s*([\d/]+)/;
+                const waktuValiditasMatch = currentMessage.match(waktuValiditasRegex);
+
+                waktuValiditas = waktuValiditasMatch ? waktuValiditasMatch[1] : '';
 
                 status = 'registered';
 
@@ -127,7 +133,13 @@ async function connectToWhatsApp () {
                 // if there is document with current nomorTelfon, then send message that user has already logged with document content
                 // else, the user data will be stored in firebase 
                 if (nomorAnggotaFromFirebase && namaLengkapFromFirebase && waktuValiditasFromFirebase) {
-                    const sendMsg = await sock.sendMessage(msg.key.remoteJid!, {text: `Anda sudah mendaftar akun sebelumnya dan masih tersimpan dalam database!\n\nBerikut datanya:\nNama Lengkap: ${namaLengkap}\nNomor Anggota: ${nomorAnggota}\nWaktu Validitas: ${waktuValiditas}\n\nSilakan langsung lampirkan pas foto 3x4 dalam bentuk gambar\nFormat JPEG, JPG, PNG` })
+                    setTimeout(async() => {
+                        try {
+                            await sock.sendMessage(msg.key.remoteJid!, {text: `Anda sudah mendaftar akun sebelumnya dan masih tersimpan dalam database!\n\nBerikut datanya:\nNama Lengkap: ${namaLengkap}\nNomor Anggota: ${nomorAnggota}\nWaktu Validitas: ${waktuValiditas}\n\nSilakan langsung lampirkan pas foto 3x4 dalam bentuk gambar\nFormat JPEG, JPG, PNG` })
+                        } catch (error) {
+                            console.error('Error sending message:', error);
+                        }
+                    }, 5000);
                 } else {
                     // Add Documents namaLengkap, nomorAnggota, waktuValiditas to Users collection in Firebase Database
                     const user = collection(db, 'Users');
@@ -138,8 +150,14 @@ async function connectToWhatsApp () {
                         "nomorTelfon": msg.key.remoteJid!.replace('@s.whatsapp.net','').replace('@g.us',''),
                         "status": status
                     });
-                    
-                    const sendMsg = await sock.sendMessage(msg.key.remoteJid!, {text: "Terima kasih! Nama Lengkap, Nomor Anggota, dan Waktu Validitas sudah tersimpan..\n\nSilakan lampirkan pas foto 3x4 dalam bentuk gambar\nFormat JPEG, JPG, PNG" })
+
+                    setTimeout(async() => {
+                        try {
+                            await sock.sendMessage(msg.key.remoteJid!, {text: "Terima kasih! Nama Lengkap, Nomor Anggota, dan Waktu Validitas sudah tersimpan..\n\nSilakan lampirkan pas foto 3x4 dalam bentuk gambar\nFormat JPEG, JPG, PNG" })
+                        } catch (error) {
+                            console.error('Error sending message:', error);
+                        }
+                    }, 5000);
                 }
             } else if (messageType === 'imageMessage' && status == 'registered') {
                 status = 'pending';
@@ -169,7 +187,13 @@ async function connectToWhatsApp () {
                 // Save image sent to the server with memberId as filename
                 await writeFile(`uploads\\pasfoto\\${userData.nomorAnggota}.png`, buffer)
 
-                const sendMsg = await sock.sendMessage(msg.key.remoteJid!, {text: "Terima kasih! Pas foto anda sudah tersimpan..\n\n1 Langkah terakhir..Silakan lampirkan bukti pembayaran dalam bentuk gambar\nFormat JPEG, JPG, PNG" })
+                setTimeout(async() => {
+                    try {
+                        await sock.sendMessage(msg.key.remoteJid!, {text: "Terima kasih! Pas foto anda sudah tersimpan..\n\n1 Langkah terakhir..Silakan lampirkan bukti pembayaran dalam bentuk gambar\nFormat JPEG, JPG, PNG" })
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                    }
+                }, 5000);
 
             } else if (messageType === 'imageMessage' && status === 'pending') {
                 status = 'validated';
@@ -199,7 +223,13 @@ async function connectToWhatsApp () {
                 // Save image sent to the server with memberId as filename
                 await writeFile(`uploads\\buktiTransfer\\${userData.nomorAnggota}.png`, buffer)
 
-                const sendMsg = await sock.sendMessage(msg.key.remoteJid!, {text: "Foto Bukti Transfer anda sudah tersimpan..\n\nSilakan tunggu beberapa waktu untuk menunggu konfirmasi dari Admin Setempat" })
+                setTimeout(async() => {
+                    try {
+                        await sock.sendMessage(msg.key.remoteJid!, {text: "Foto Bukti Transfer anda sudah tersimpan..\n\nSilakan tunggu beberapa waktu untuk menunggu konfirmasi dari Admin Setempat" })
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                    }
+                }, 4000);
 
                 ///////////////////////////////////
                 //// SEND CONFIRMATION TO ADMIN
@@ -208,63 +238,63 @@ async function connectToWhatsApp () {
 
                 // send pasfoto image from Firebase storage
                 setTimeout(async() => {
-                    await sock.sendMessage(NOMOR_ADMIN, { 
-                        image: {
-                            url:`uploads\\pasfoto\\${userData.nomorAnggota}.png`
-                        }
-                    });
-                }, 5000);
+                    try {
+                        await sock.sendMessage(NOMOR_ADMIN, { 
+                            image: {
+                                url:`uploads\\pasfoto\\${userData.nomorAnggota}.png`
+                            }
+                        });
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                    }
+                }, 4000);
 
                 // send bukti transfer image from Firebase storage
                 setTimeout(async() => {
-                    await sock.sendMessage(NOMOR_ADMIN, { 
-                        image: {
-                            url:`uploads\\buktiTransfer\\${userData.nomorAnggota}.png`
-                        }
-                    });
-                }, 5000);
+                    try {
+                        await sock.sendMessage(NOMOR_ADMIN, { 
+                            image: {
+                                url:`uploads\\buktiTransfer\\${userData.nomorAnggota}.png`
+                            }
+                        });
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                    }
+                }, 6000);
                 
                 // Validation Buttons
-                const textMessage = `${userData.namaLengkap} melakukan registrasi berikut data, pas foto, dan bukti transfernya:\n\nNama Lengkap: ${userData.namaLengkap}\nNomor Anggota: ${userData.nomorAnggota}\nWaktu Validitas: ${userData.waktuValiditas}`
-
-                const validateTextTemplateButton = `nomorTelfonValidate: ${userData.nomorTelfon}`;
-                const notValidateTextTemplateButton = `nomorTelfonNotValidate: ${userData.nomorTelfon}`;
-                const buttons = [
-                    // RETURN number of requested user for recognition
-                    {buttonId: validateTextTemplateButton, buttonText: {displayText: 'YA!'}, type: 1},
-                    {buttonId: notValidateTextTemplateButton, buttonText: {displayText: 'TIDAK!'}, type: 1},
-                ]
-                const buttonInfo = {
-                    text: textMessage,
-                    buttons: buttons,
-                    headerType: 1,
-                    viewOnce:true
-                }
-
+                const textMessage = `${userData.namaLengkap} melakukan registrasi berikut data, pas foto, dan bukti transfernya:\n\nNama Lengkap: ${userData.namaLengkap}\nNomor Anggota: ${userData.nomorAnggota}\nWaktu Validitas: ${userData.waktuValiditas}\n\nSetujui pembuatan kartu anggota dengan data tersebut? \n\nKetikkan "${userData.nomorTelfon} YA" untuk menyutujui\nKetikkan "${userData.nomorTelfon} TIDAK" untuk menolak`
+                
                 setTimeout(async() => {
-                    await sock.sendMessage(NOMOR_ADMIN, buttonInfo);
-                }, 5000);
-
-            } else if (((responseButton?.selectedButtonId && status === 'validated') || role === 'admin')) {
+                    try {
+                        await sock.sendMessage(NOMOR_ADMIN, {text: textMessage});
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                    }
+                }, 8000);
+    
+            } else if (((status === 'validated') || role === 'admin')) {
                 status = 'registered';
 
-                // GET number of requested user
-                let requestedUserNumber = responseButton?.selectedButtonId;
-                console.log("RESPONSE BUTTON:", requestedUserNumber)
-                requestedUserNumber = requestedUserNumber.replace('nomorTelfonValidate: ','').replace('nomorTelfonNotValidate: ','');
+                let requestedUserNumber = currentMessage
+                requestedUserNumber = requestedUserNumber.replace(/\s/g, '').replace('YA','').replace('TIDAK','');
+                console.log('NUMBER',requestedUserNumber)
                 
                 let requestedUserNumberSend;
                 
-                if(msg.key.remoteJid!.startsWith(' 62') && msg.key.remoteJid!.length >= 10 && msg.key.remoteJid!.length <= 13) {
+                // Remove any non-digit characters from the number
+                const cleanedNumber = requestedUserNumber.replace(/\D/g, '');
+                const regex = /^62\d{10,12}$/;
+                if(regex.test(requestedUserNumber)) {
                     requestedUserNumberSend = requestedUserNumber + "@s.whatsapp.net";
                 } else {
                     requestedUserNumberSend = requestedUserNumber + "@g.us";
                 }
-                console.log("RESPONSE SEND:", requestedUserNumberSend)
                 
                 // Retrieve data from firebase based on Requested User WhatsApp Number
                 let requestedUserData = await getUserDataFromWhatsappNumber(requestedUserNumber)
-                
+                console.log('DATA USER',requestedUserData)
+
                 // Edit Documents status PENDING to Users collection in Firebase Database
                 const userRef = collection(db, 'Users');
                 const querySnapshot = await getDocs(query(userRef, where('nomorTelfon', '==', requestedUserData.nomorTelfon)));
@@ -281,57 +311,103 @@ async function connectToWhatsApp () {
                 });
 
                 // If VALIDATE
-                if(responseButton?.selectedButtonId.includes("nomorTelfonValidate: ")){
+                if(currentMessage.includes('YA')){
                     await textOverlay(requestedUserData.namaLengkap, requestedUserData.nomorAnggota, requestedUserData.waktuValiditas);
 
+                    console.log("SEND NUMBER",requestedUserNumberSend)
+
                     // DISINI HARUSNYA NGIRIM KE CUSTOMER, BUKAN KE ADMIN
-                    await sock.sendMessage(requestedUserNumberSend, {text: 'Selamat Kartu Anggota anda berhasil dibuat!' })
-                    await sock.sendMessage(requestedUserNumberSend, { 
-                        image: {
-                            url:`output\\${requestedUserData.nomorAnggota}.png`
+                    setTimeout(async() => {
+                        try {
+                            await sock.sendMessage(requestedUserNumberSend, {text: 'Selamat Kartu Anggota anda berhasil dibuat!' })
+                        } catch (error) {
+                            console.error('Error sending message:', error);
                         }
-                    });
+                    }, 4000);
+
+                    setTimeout(async() => {
+                        try {
+                            await sock.sendMessage(requestedUserNumberSend, { 
+                                image: {
+                                    url:`output\\${requestedUserData.nomorAnggota}.png`
+                                }
+                            });
+                        } catch (error) {
+                            console.error('Error sending message:', error);
+                        }
+                    }, 5000);
+                    
 
                     let file = `output\\${requestedUserData.nomorAnggota}.pdf`;
                     const mimeType = mime.lookup(file);
-                    await sock.sendMessage(requestedUserNumberSend, {
-						document: { url: file },
-						caption: `Berikut kartu anggota ${requestedUserData.namaLengkap} dalam format PDF`, 
-						fileName: path.basename(file), 
-						mimetype: mimeType
-					});
+                    setTimeout(async() => {
+                        try {
+                            await sock.sendMessage(requestedUserNumberSend, {
+                                document: { url: file },
+                                caption: `Berikut kartu anggota ${requestedUserData.namaLengkap} dalam format PDF`, 
+                                fileName: path.basename(file), 
+                                mimetype: mimeType
+                            });
+                        } catch (error) {
+                            console.error('Error sending message:', error);
+                        }
+                    }, 6000);
 
                     // Delay time to avoid spamming alert
                     setTimeout(async() => {
-                        // send the image to ADMIN
-                        await sock.sendMessage(NOMOR_ADMIN, { 
-                            image: {
-                                url:`output\\${requestedUserData.nomorAnggota}.png`
-                            }
-                        });
-                    }, 5000);
+                        try {
+                            // send the image to ADMIN
+                            await sock.sendMessage(NOMOR_ADMIN, { 
+                                image: {
+                                    url:`output\\${requestedUserData.nomorAnggota}.png`
+                                }
+                            });
+                        } catch (error) {
+                            console.error('Error sending message:', error);
+                        }
+                    }, 7000);
 
                     // Delay time to avoid spamming alert
                     setTimeout(async() => {
-                        // Thanks to Admin for validating users
-                        await sock.sendMessage(NOMOR_ADMIN, {text: `Terima kasih! Kartu anggota digital akan segera dikirimkan ke nomor ${requestedUserData.namaLengkap}` })
-                    }, 5000);
+                        try {
+                            // Thanks to Admin for validating users
+                            await sock.sendMessage(NOMOR_ADMIN, {text: `Terima kasih! Kartu anggota digital akan segera dikirimkan ke nomor ${requestedUserData.namaLengkap}` })
+                        } catch (error) {
+                            console.error('Error sending message:', error);
+                        }
+                    }, 8000);
                 }
 
                 // IF NOT VALIDATE
-                else if(responseButton?.selectedButtonId.includes("nomorTelfonNotValidate: ")){
+                else if(currentMessage.includes('TIDAK')){
                     // DISINI HARUSNYA NGIRIM KE CUSTOMER, BUKAN KE ADMIN
-                    await sock.sendMessage(requestedUserNumberSend, {text: 'Sayang sekali pengajuan kartu anggota anda ditolak..\n\nSilakan hubungi admin berikut untuk konfirmasi segera' })
+                    setTimeout(async() => {
+                        try {
+                            await sock.sendMessage(requestedUserNumberSend, {text: 'Sayang sekali pengajuan kartu anggota anda ditolak..\n\nSilakan hubungi admin berikut untuk konfirmasi segera' })
+                        } catch (error) {
+                            console.error('Error sending message:', error);
+                        }
+                    }, 5000);
 
                     // Delay time to avoid spamming alert
                     setTimeout(async() => {
-                        // Thanks to Admin for validating users
-                        await sock.sendMessage(NOMOR_ADMIN, {text: `Terima kasih! Penolakan pembuatan kartu anggota akan diberitahukan ke nomor ${requestedUserData.namaLengkap}` })
-                    }, 5000);
+                        try {
+                            // Thanks to Admin for validating users
+                            await sock.sendMessage(NOMOR_ADMIN, {text: `Terima kasih! Penolakan pembuatan kartu anggota akan diberitahukan ke nomor ${requestedUserData.namaLengkap}` })
+                        } catch (error) {
+                            console.error('Error sending message:', error);
+                        }
+                    }, 7000);
                 }
 
             } else {
-                await sock.sendMessage(msg.key.remoteJid!, {text: "Halo, Selamat Datang di WhatsApp Bot Membership Card Auto-Generated. \n\nTerima kasih telah menghubungi kontak admin kami!\nSilakan tulis isian di bawah ini!\n\nNama Lengkap:\nNomor Anggota:\nWaktu Validitas:\n\nContoh:\nNama Lengkap: Dimas Wisnu\nNomor Anggota: 201524005\nWaktu Validitas: 10/12/2002"});
+                setTimeout(async() => {
+                    try {
+                        await sock.sendMessage(msg.key.remoteJid!, {text: "Halo, Selamat Datang di WhatsApp Bot Membership Card Auto-Generated. \n\nTerima kasih telah menghubungi kontak admin kami!\nSilakan tulis isian di bawah ini!\n\nNama Lengkap:\nNomor Anggota:\nWaktu Validitas:\n\nContoh:\nNama Lengkap: Dimas Wisnu\nNomor Anggota: 201524005\nWaktu Validitas: 10/12/2002"});
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                    }
+                }, 5000);
                 
                 await exportCollectionAndStorageToExcel('Users', 'output/excel/data.xlsx', 'memberPhoto/')
             }
