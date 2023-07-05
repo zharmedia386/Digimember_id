@@ -11,12 +11,12 @@ import mime from 'mime-types';
 import * as ExcelJS from 'exceljs';
 
 const firebaseConfig = {
-    apiKey: "AIzaSyCnii7QCWf_ln0WvkeAPBN9p3xUCAQIzbs",
-    authDomain: "digimember-3166a.firebaseapp.com",
-    projectId: "digimember-3166a",
-    storageBucket: "digimember-3166a.appspot.com",
-    messagingSenderId: "1076910703361",
-    appId: "1:1076910703361:web:881074076f9a8d9ef71100"
+    apiKey: "AIzaSyBWOqUYZDc8ehFPUFS8p1JbABc_rts26lE",
+    authDomain: "ppi-jabar.firebaseapp.com",
+    projectId: "ppi-jabar",
+    storageBucket: "ppi-jabar.appspot.com",
+    messagingSenderId: "771885703085",
+    appId: "1:771885703085:web:ffa8cc1b0702f86d3f8b24"
 };
 
 // firebase config
@@ -82,14 +82,12 @@ async function connectToWhatsApp () {
         // Determine whether the message is a personal or group message
         let currentMessage = msg.message?.extendedTextMessage?.text ? msg.message?.extendedTextMessage?.text : msg.message!.conversation;
 
-        let nomorAnggota = '';
-        let namaLengkap = '';
-        let waktuValiditas = '';
         let status = '';
+        let nomorAnggota = '';
+        let noKTP = '';
 
         let nomorAnggotaFromFirebase = '';
-        let namaLengkapFromFirebase = '';
-        let waktuValiditasFromFirebase = '';
+        let noKTPFromFirebase = '';
 
         if(userData) {
             status = userData.status;
@@ -103,54 +101,35 @@ async function connectToWhatsApp () {
         }
 
         if(!msg.key.fromMe && m.type === 'notify') {
-            if(currentMessage.includes('Nama Lengkap: ') && currentMessage.includes('Nomor Anggota:') && currentMessage.includes('Waktu Validitas:')){
-                // Get only the value of namaLengkap, nomorAnggota, waktuValiditas
-                const namaLengkapRegex = /Nama Lengkap: ([^\n]+)/;
-                const namaLengkapMatch = currentMessage.match(namaLengkapRegex);
-                namaLengkap = namaLengkapMatch ? namaLengkapMatch[1] : '';
+            if(currentMessage.includes('Yakin')){
+                setTimeout(async() => {
+                    try {
+                        await sock.sendMessage(msg.key.remoteJid!, {text: `Anda dapat memilih salah satu pilihan di bawah ini:\n\n*Ketik*\n\n1️⃣ Mengisi Data\n2️⃣ Mencetak Kembali` })
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                    }
+                }, 5000);
 
-                const nomorAnggotaRegex = /Nomor Anggota: (\d+)/;
-                const nomorAnggotaMatch = currentMessage.match(nomorAnggotaRegex);
-                nomorAnggota = nomorAnggotaMatch ? nomorAnggotaMatch[1] : '';
-                
-                waktuValiditas = currentMessage.split('Nomor Anggota: ')[1];
-                waktuValiditas = waktuValiditas.replace(/(?:\r\n|\r|\n)/g, '');
-                const waktuValiditasRegex = /Waktu Validitas:\s*([\d/]+)/;
-                const waktuValiditasMatch = currentMessage.match(waktuValiditasRegex);
-
-                waktuValiditas = waktuValiditasMatch ? waktuValiditasMatch[1] : '';
-
-                status = 'registered';
+                status = 'boarding';
 
                 // if user document in firebase is found with the current user's nomorTelfon
                 if(userData) {
                     nomorAnggotaFromFirebase = userData.nomorAnggota;
-                    namaLengkapFromFirebase = userData.namaLengkap;
-                    waktuValiditasFromFirebase = userData.waktuValiditas;
+                    noKTPFromFirebase = userData.noKTP;
                 }
 
                 // Validate that one user should have one document in firebase with nomorTelfon constraints
                 // if there is document with current nomorTelfon, then send message that user has already logged with document content
                 // else, the user data will be stored in firebase 
-                if (nomorAnggotaFromFirebase && namaLengkapFromFirebase && waktuValiditasFromFirebase) {
+                if (nomorAnggotaFromFirebase && noKTPFromFirebase) {
                     setTimeout(async() => {
                         try {
-                            await sock.sendMessage(msg.key.remoteJid!, {text: `Anda sudah mendaftar akun sebelumnya dan masih tersimpan dalam database!\n\nBerikut datanya:\nNama Lengkap: ${namaLengkap}\nNomor Anggota: ${nomorAnggota}\nWaktu Validitas: ${waktuValiditas}\n\nSilakan langsung lampirkan pas foto 3x4 dalam bentuk gambar\nFormat JPEG, JPG, PNG` })
+                            await sock.sendMessage(msg.key.remoteJid!, {text: `Anda sudah mendaftar akun sebelumnya dan masih tersimpan dalam database!\n\nBerikut datanya:\nNomor KTP: ${noKTP}\nNomor Anggota: ${nomorAnggota}\n\nApakah Anda mengetahui NRA anda?` })
                         } catch (error) {
                             console.error('Error sending message:', error);
                         }
                     }, 5000);
                 } else {
-                    // Add Documents namaLengkap, nomorAnggota, waktuValiditas to Users collection in Firebase Database
-                    const user = collection(db, 'Users');
-                    await addDoc(user, {
-                        "namaLengkap": namaLengkap,
-                        "nomorAnggota": nomorAnggota,
-                        "waktuValiditas": waktuValiditas,
-                        "nomorTelfon": msg.key.remoteJid!.replace('@s.whatsapp.net','').replace('@g.us',''),
-                        "status": status
-                    });
-
                     setTimeout(async() => {
                         try {
                             await sock.sendMessage(msg.key.remoteJid!, {text: "Terima kasih! Nama Lengkap, Nomor Anggota, dan Waktu Validitas sudah tersimpan..\n\nSilakan lampirkan pas foto 3x4 dalam bentuk gambar\nFormat JPEG, JPG, PNG" })
@@ -160,6 +139,25 @@ async function connectToWhatsApp () {
                     }, 5000);
                 }
             } else if (messageType === 'imageMessage' && status == 'registered') {
+                if(parseInt(currentMessage) == 1) {
+                    setTimeout(async() => {
+                        try {
+                            await sock.sendMessage(msg.key.remoteJid!, 
+                                {text: `Mohon siapkan hal-hal berikut untuk mengisi data:\n1️⃣ Nomor KTP\n2️⃣ NRA\n\nJika sudah siap, Silakan ketik *Siap* untuk melanjutkan` })
+                        } catch (error) {
+                            console.error('Error sending message:', error);
+                        }
+                    }, 5000);
+                } else if(parseInt(currentMessage) == 2) {
+                    setTimeout(async() => {
+                        try {
+                            await sock.sendMessage(msg.key.remoteJid!, {text: `Mohon siapkan hal-hal berikut untuk mengisi data:\n1️⃣ Nomor KTP\n2️⃣ NRA\n 3️⃣ Jabatan\n(Pengurus Pusat/Pengurus Provinsi/Pengurus KabupatenKota/Anggota Biasa/Anggota Kehormatan/Generasi Muda PPI)\n\nJika sudah siap, Silakan ketik *Siap* untuk melanjutkan` })
+                        } catch (error) {
+                            console.error('Error sending message:', error);
+                        }
+                    }, 5000);
+                }
+
                 status = 'pending';
                 
                 // Edit Documents status PENDING to Users collection in Firebase Database
@@ -403,7 +401,7 @@ async function connectToWhatsApp () {
             } else {
                 setTimeout(async() => {
                     try {
-                        await sock.sendMessage(msg.key.remoteJid!, {text: "Halo, Selamat Datang di WhatsApp Bot Membership Card Auto-Generated. \n\nTerima kasih telah menghubungi kontak admin kami!\nSilakan tulis isian di bawah ini!\n\nNama Lengkap:\nNomor Anggota:\nWaktu Validitas:\n\nContoh:\nNama Lengkap: Dimas Wisnu\nNomor Anggota: 201524005\nWaktu Validitas: 10/12/2002"});
+                        await sock.sendMessage(msg.key.remoteJid!, {text: "Halo, Selamat Datang di WhatsApp Bot Pembuatan KPA PPI Jabar. \n\nApakah anda yakin untuk melanjutkan proses pembuatan KPA?\nKetik *Yakin* untuk melanjutkan\n\nTutorial Cara Pakai Chatbot:\nLink"});
                     } catch (error) {
                         console.error('Error sending message:', error);
                     }
@@ -435,17 +433,18 @@ async function getUserDataFromWhatsappNumber(nomorTelfon) {
 ***************************************************/
 async function textOverlay(namaLengkap, nomorAnggota, waktuValiditas) {
     // Call Overlay Text in Image Function in helpres folder
-    const image = await Jimp.read('assets/image/mc_polosan.png');
+    const kd = await Jimp.read('assets/image/mc_polosan.png');
+    const kb = await Jimp.read('assets/image/kb.png');
 
     // Defining the text font
     const poppins_bold1 = await Jimp.loadFont('assets/font/fnt/poppins-bold.fnt');
-    image.print(poppins_bold1, 906.8, 1507, namaLengkap);
+    kd.print(poppins_bold1, 906.8, 1507, namaLengkap);
 
     const poppins_semibold_italic = await Jimp.loadFont('assets/font/fnt/poppins-semibold-italic.fnt');
-    image.print(poppins_semibold_italic, 1079, 1638, nomorAnggota);
+    kd.print(poppins_semibold_italic, 1079, 1638, nomorAnggota);
 
     const poppins_bold2 = await Jimp.loadFont('assets/font/fnt/poppins-bold1.fnt');
-    image.print(poppins_bold2, 198, 1053, waktuValiditas);
+    kd.print(poppins_bold2, 198, 1053, waktuValiditas);
 
     // masking image with shape background
     let member_photo = await Jimp.read(`uploads\\pasfoto\\${nomorAnggota}.png`);
@@ -463,10 +462,10 @@ async function textOverlay(namaLengkap, nomorAnggota, waktuValiditas) {
     let masked = member_photo.mask(mask, 0, 0);
     masked = await masked;
 
-    image.composite(masked, 195.8, 1255)
+    kd.composite(masked, 195.8, 1255)
 
     // Writing image after processing
-    await image.writeAsync(`output\\${nomorAnggota}.png`);
+    await kd.writeAsync(`output\\${nomorAnggota}.png`);
     convertPNGtoPDF(`output\\${nomorAnggota}.png`, `output\\${nomorAnggota}.pdf`);
 
     // Writing Membership Card image in Firebase Storage
