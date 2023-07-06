@@ -15,7 +15,7 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "ts-node mockup.ts"
+    "dev": "nodemon index.ts"
   },
   "keywords": [],
   "author": "",

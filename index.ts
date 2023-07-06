@@ -83,11 +83,17 @@ async function connectToWhatsApp () {
         let currentMessage = msg.message?.extendedTextMessage?.text ? msg.message?.extendedTextMessage?.text : msg.message!.conversation;
 
         let status = '';
-        let nomorAnggota = '';
+        let namaLengkap = '';
         let noKTP = '';
+        let NRA = '';
+        let jabatan = '';
+        let tanggalPembuatan = new Date().toLocaleString();;
 
-        let nomorAnggotaFromFirebase = '';
+        let namaLengkapFromFirebase = '';
+        let NRAFromFirebase = '';
         let noKTPFromFirebase = '';
+        let jabatanFromFirebase = '';
+        let tanggalPembuatanFromFirebase = '';
 
         if(userData) {
             status = userData.status;
@@ -101,7 +107,7 @@ async function connectToWhatsApp () {
         }
 
         if(!msg.key.fromMe && m.type === 'notify') {
-            if(currentMessage.includes('Yakin')){
+            if(currentMessage.includes('Yakin') || currentMessage.includes('yakin')){
                 setTimeout(async() => {
                     try {
                         await sock.sendMessage(msg.key.remoteJid!, {text: `Anda dapat memilih salah satu pilihan di bawah ini:\n\n*Ketik*\n\n1️⃣ Mengisi Data\n2️⃣ Mencetak Kembali` })
@@ -109,57 +115,64 @@ async function connectToWhatsApp () {
                         console.error('Error sending message:', error);
                     }
                 }, 5000);
-
+                
                 status = 'boarding';
 
-                // if user document in firebase is found with the current user's nomorTelfon
                 if(userData) {
-                    nomorAnggotaFromFirebase = userData.nomorAnggota;
-                    noKTPFromFirebase = userData.noKTP;
+                    // Edit Documents status PENDING to Users collection in Firebase Database
+                    const userRef = collection(db, 'Users');
+                    const querySnapshot = await getDocs(query(userRef, where('nomorTelfon', '==', userData.nomorTelfon)));
+
+                    querySnapshot.forEach((adminRequestDoc) => {
+                        const userDocRef = doc(db, 'Users', adminRequestDoc.id);
+                        updateDoc(userDocRef, {
+                            "namaLengkap": userData?.namaLengkap,
+                            "noKTP": userData?.noKTP,
+                            "NRA": userData?.NRA,
+                            "jabatan": userData?.jabatan,
+                            "nomorTelfon": msg.key.remoteJid!.replace('@s.whatsapp.net','').replace('@g.us',''),
+                            "status": status
+                        });
+                    });
+                    
+                } else {
+                    // Add Documents namaLengkap, NRA, noKTP to Users collection in Firebase Database
+                    const user = collection(db, 'Users');
+                    await addDoc(user, {
+                        "namaLengkap": namaLengkap,
+                        "noKTP": noKTP,
+                        "NRA": NRA,
+                        "jabatan": jabatan,
+                        "tanggalPembuatan": tanggalPembuatan,
+                        "nomorTelfon": msg.key.remoteJid!.replace('@s.whatsapp.net','').replace('@g.us',''),
+                        "status": status
+                    });
                 }
 
-                // Validate that one user should have one document in firebase with nomorTelfon constraints
-                // if there is document with current nomorTelfon, then send message that user has already logged with document content
-                // else, the user data will be stored in firebase 
-                if (nomorAnggotaFromFirebase && noKTPFromFirebase) {
-                    setTimeout(async() => {
-                        try {
-                            await sock.sendMessage(msg.key.remoteJid!, {text: `Anda sudah mendaftar akun sebelumnya dan masih tersimpan dalam database!\n\nBerikut datanya:\nNomor KTP: ${noKTP}\nNomor Anggota: ${nomorAnggota}\n\nApakah Anda mengetahui NRA anda?` })
-                        } catch (error) {
-                            console.error('Error sending message:', error);
-                        }
-                    }, 5000);
-                } else {
-                    setTimeout(async() => {
-                        try {
-                            await sock.sendMessage(msg.key.remoteJid!, {text: "Terima kasih! Nama Lengkap, Nomor Anggota, dan Waktu Validitas sudah tersimpan..\n\nSilakan lampirkan pas foto 3x4 dalam bentuk gambar\nFormat JPEG, JPG, PNG" })
-                        } catch (error) {
-                            console.error('Error sending message:', error);
-                        }
-                    }, 5000);
-                }
-            } else if (messageType === 'imageMessage' && status == 'registered') {
+            } else if (status == 'boarding') {
                 if(parseInt(currentMessage) == 1) {
+                    status = 'mengisi';
+
                     setTimeout(async() => {
                         try {
                             await sock.sendMessage(msg.key.remoteJid!, 
-                                {text: `Mohon siapkan hal-hal berikut untuk mengisi data:\n1️⃣ Nomor KTP\n2️⃣ NRA\n\nJika sudah siap, Silakan ketik *Siap* untuk melanjutkan` })
+                                {text: `Mohon siapkan hal-hal berikut untuk mengisi data:\n1️⃣ Nomor KTP\n2️⃣ NRA\n3️⃣ Pas Foto ukuran 3.6 x 3.4 cm menggunakan Pakaian Dinas Harian\n4️⃣ Jabatan\n(Pengurus Pusat/Pengurus Provinsi/Pengurus KabupatenKota/Anggota Biasa/Anggota Kehormatan/Generasi Muda PPI)\n\nJika sudah siap, Silakan ketik *Siap* untuk melanjutkan` })
                         } catch (error) {
                             console.error('Error sending message:', error);
                         }
                     }, 5000);
                 } else if(parseInt(currentMessage) == 2) {
+                    status = 'mencetak';
+
                     setTimeout(async() => {
                         try {
-                            await sock.sendMessage(msg.key.remoteJid!, {text: `Mohon siapkan hal-hal berikut untuk mengisi data:\n1️⃣ Nomor KTP\n2️⃣ NRA\n 3️⃣ Jabatan\n(Pengurus Pusat/Pengurus Provinsi/Pengurus KabupatenKota/Anggota Biasa/Anggota Kehormatan/Generasi Muda PPI)\n\nJika sudah siap, Silakan ketik *Siap* untuk melanjutkan` })
+                            await sock.sendMessage(msg.key.remoteJid!, {text: `Mohon siapkan hal-hal berikut untuk mengisi data:\n1️⃣ Nomor KTP\n2️⃣ NRA\n3️⃣ Pas Foto ukuran 3.6 x 3.4 cm menggunakan Pakaian Dinas Harian\n\nJika sudah siap, Silakan ketik *Siap* untuk melanjutkan` })
                         } catch (error) {
                             console.error('Error sending message:', error);
                         }
                     }, 5000);
                 }
 
-                status = 'pending';
-                
                 // Edit Documents status PENDING to Users collection in Firebase Database
                 const userRef = collection(db, 'Users');
                 const querySnapshot = await getDocs(query(userRef, where('nomorTelfon', '==', userData.nomorTelfon)));
@@ -167,13 +180,118 @@ async function connectToWhatsApp () {
                 querySnapshot.forEach((adminRequestDoc) => {
                     const userDocRef = doc(db, 'Users', adminRequestDoc.id);
                     updateDoc(userDocRef, {
-                        "namaLengkap": userData.namaLengkap,
-                        "nomorAnggota": userData.nomorAnggota,
-                        "waktuValiditas": userData.waktuValiditas,
+                        "namaLengkap": userData?.namaLengkap,
+                        "noKTP": userData?.noKTP,
+                        "NRA": userData?.NRA,
+                        "jabatan": userData?.jabatan,
                         "nomorTelfon": msg.key.remoteJid!.replace('@s.whatsapp.net','').replace('@g.us',''),
                         "status": status
                     });
                 });
+
+            } else if ( ((status == 'mengisi' || status == 'mencetak') && (currentMessage.includes('Siap') || currentMessage.includes('siap') )) ) {
+                if(status == 'mengisi' ) {
+                    setTimeout(async() => {
+                        try {
+                            await sock.sendMessage(msg.key.remoteJid!, 
+                                {text: `Jika sudah siap, silakan isikan data-data berikut:\n\nNama Lengkap:\nNomor KTP:\nNRA:\nJabatan:\n\nJabatan isikan salah satu berikut dalam bentuk nomor : \n1. Pengurus Pusat\n2. Pengurus Provinsi\n3. Pengurus KabupatenKota\n4. Anggota Biasa\n5. Anggota Kehormatan\n6. Generasi Muda PPI\n\nContoh:\nNama Lengkap: Mufadhdhol Alfian Y\nnoKTP: 10502457890001\nNRA: 2018 0915 026\nJabatan: 5` })
+                        } catch (error) {
+                            console.error('Error sending message:', error);
+                        }
+                    }, 5000);
+                } else if(status == 'mencetak') {
+                    setTimeout(async() => {
+                        try {
+                            await sock.sendMessage(msg.key.remoteJid!, 
+                                {text: `Jika sudah siap, silakan isikan data-data berikut:\n\nNama Lengkap:\nNomor KTP:\nNRA:\n\nContoh: \nNama Lengkap: Mufadhdhol Alfian Y\nnoKTP: 10502457890001\nNRA: 2018 0915 026` })
+                        } catch (error) {
+                            console.error('Error sending message:', error);
+                        }
+                    }, 5000);
+                }
+
+                status = 'filled'
+
+                // Edit Documents status PENDING to Users collection in Firebase Database
+                const userRef = collection(db, 'Users');
+                const querySnapshot = await getDocs(query(userRef, where('nomorTelfon', '==', userData.nomorTelfon)));
+
+                querySnapshot.forEach((adminRequestDoc) => {
+                    const userDocRef = doc(db, 'Users', adminRequestDoc.id);
+                    updateDoc(userDocRef, {
+                        "namaLengkap": userData?.namaLengkap,
+                        "noKTP": userData?.noKTP,
+                        "NRA": userData?.NRA,
+                        "jabatan": userData?.jabatan,
+                        "nomorTelfon": msg.key.remoteJid!.replace('@s.whatsapp.net','').replace('@g.us',''),
+                        "status": status
+                    });
+                });
+            } else if ((status == 'filled') && ( (currentMessage.includes('Nama Lengkap: ')) && (currentMessage.includes('noKTP: ')) && (currentMessage.includes('NRA: '))) ) {
+                // Get only the value of namaLengkap, noKTP, NRA, jabatan
+                const namaLengkapRegex = /Nama Lengkap: ([^\n]+)/;
+                const namaLengkapMatch = currentMessage.match(namaLengkapRegex);
+                namaLengkap = namaLengkapMatch ? namaLengkapMatch[1] : '';
+
+                const noKTPRegex = /noKTP: (\d+)/;
+                const noKTPMatch = currentMessage.match(noKTPRegex);
+                noKTP = noKTPMatch ? noKTPMatch[1] : '';
+
+                const NRARegex = /NRA: (\d+)/;
+                const NRAMatch = currentMessage.match(NRARegex);
+                NRA = NRAMatch ? NRAMatch[1] : '';
+                
+                jabatan = currentMessage.split('NRA: ')[1];
+                jabatan = jabatan.replace(/(?:\r\n|\r|\n)/g, '');
+                const jabatanRegex = /Jabatan:\s*([\d/]+)/;
+                const jabatanMatch = currentMessage.match(jabatanRegex);
+
+                jabatan = jabatanMatch ? jabatanMatch[1] : '';
+
+                if (parseInt(jabatan) === 1) {
+                    jabatan = 'Pengurus Pusat';
+                } else if (parseInt(jabatan) === 2) {
+                    jabatan = 'Pengurus Provinsi';
+                } else if (parseInt(jabatan) === 3) {
+                    jabatan = 'Pengurus Kabupaten/Kota';
+                } else if (parseInt(jabatan) === 4) {
+                    jabatan = 'Anggota Biasa';
+                } else if (parseInt(jabatan) === 5) {
+                 jabatan = 'Anggota Kehormatan';
+                } else if (parseInt(jabatan) === 6) {
+                    jabatan = 'Generasi Muda PPI';
+                } 
+
+                status = 'registered';
+
+                // Edit Documents status PENDING to Users collection in Firebase Database
+                const userRef = collection(db, 'Users');
+                const querySnapshot = await getDocs(query(userRef, where('nomorTelfon', '==', userData.nomorTelfon)));
+
+                querySnapshot.forEach((adminRequestDoc) => {
+                    const userDocRef = doc(db, 'Users', adminRequestDoc.id);
+                    updateDoc(userDocRef, {
+                        "namaLengkap": namaLengkap,
+                        "noKTP": noKTP,
+                        "NRA": NRA,
+                        "jabatan": jabatan,
+                        "nomorTelfon": msg.key.remoteJid!.replace('@s.whatsapp.net','').replace('@g.us',''),
+                        "status": status
+                    });
+                });
+
+                // Send Message to ask applicants send pasFoto
+                setTimeout(async() => {
+                    try {
+                        await sock.sendMessage(msg.key.remoteJid!, {text: "Terima kasih! Data Anda berupa Nama Lengkap, noTKP, dan lainnya sudah tersimpan..\n\nSilakan lampirkan pas foto ukuran 3.6 x 3.4 cm menggunakan Pakaian Dinas Harian dalam bentuk gambar Format JPEG, JPG, PNG" })
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                    }
+                }, 5000);
+            }
+            else if (messageType === 'imageMessage' && status == 'registered') {
+            
+                status = 'pending';
 
                 // Download image from users
                 const buffer = await downloadMediaMessage(
@@ -203,9 +321,9 @@ async function connectToWhatsApp () {
                 querySnapshot.forEach((adminRequestDoc) => {
                     const userDocRef = doc(db, 'Users', adminRequestDoc.id);
                     updateDoc(userDocRef, {
-                        "namaLengkap": userData.namaLengkap,
-                        "nomorAnggota": userData.nomorAnggota,
-                        "waktuValiditas": userData.waktuValiditas,
+                        "namaLengkap": userData?.namaLengkap,
+                        "nomorAnggota": userData?.nomorAnggota,
+                        "waktuValiditas": userData?.waktuValiditas,
                         "nomorTelfon": msg.key.remoteJid!.replace('@s.whatsapp.net','').replace('@g.us',''),
                         "status": status
                     });
@@ -310,7 +428,7 @@ async function connectToWhatsApp () {
 
                 // If VALIDATE
                 if(currentMessage.includes('YA')){
-                    await textOverlay(requestedUserData.namaLengkap, requestedUserData.nomorAnggota, requestedUserData.waktuValiditas);
+                    await textOverlay(requestedUserData.namaLengkap, requestedUserData.nomorAnggota);
 
                     console.log("SEND NUMBER",requestedUserNumberSend)
 
@@ -401,7 +519,7 @@ async function connectToWhatsApp () {
             } else {
                 setTimeout(async() => {
                     try {
-                        await sock.sendMessage(msg.key.remoteJid!, {text: "Halo, Selamat Datang di WhatsApp Bot Pembuatan KPA PPI Jabar. \n\nApakah anda yakin untuk melanjutkan proses pembuatan KPA?\nKetik *Yakin* untuk melanjutkan\n\nTutorial Cara Pakai Chatbot:\nLink"});
+                        await sock.sendMessage(msg.key.remoteJid!, {text: "Halo, Selamat Datang di WhatsApp Bot Pembuatan KPA PPI Jabar. \n\nApakah anda yakin untuk melanjutkan proses pembuatan KPA?\nKetik *Yakin* untuk melanjutkan\n\nTutorial Cara Pakai Chatbot dan Membuat pas foto ukuran 3.6 x 3.4 cm:\nLink"});
                     } catch (error) {
                         console.error('Error sending message:', error);
                     }
@@ -431,25 +549,46 @@ async function getUserDataFromWhatsappNumber(nomorTelfon) {
 *** ./helpers/textOverlayImage.ts
 *** Generate card from input users using JIMP
 ***************************************************/
-async function textOverlay(namaLengkap, nomorAnggota, waktuValiditas) {
+async function textOverlay(namaLengkap, nomorAnggota) {
+    let nomorAnggota_print = "NRA. " + nomorAnggota
+    let namaLengkap_print = namaLengkap.toUpperCase();
+
     // Call Overlay Text in Image Function in helpres folder
-    const kd = await Jimp.read('assets/image/mc_polosan.png');
-    const kb = await Jimp.read('assets/image/kb.png');
+    const quality = 100; // Set the desired quality value (0-100)
+    let kd = await Jimp.read('assets/image/kd_anggota_biasa_1.png');
+
+    let kb = await Jimp.read('assets/image/kb_1.png');
 
     // Defining the text font
-    const poppins_bold1 = await Jimp.loadFont('assets/font/fnt/poppins-bold.fnt');
-    kd.print(poppins_bold1, 906.8, 1507, namaLengkap);
+    const time_new_roman_bold = await Jimp.loadFont('assets/font/fnt/time_new_roman_bold_1.fnt');
 
-    const poppins_semibold_italic = await Jimp.loadFont('assets/font/fnt/poppins-semibold-italic.fnt');
-    kd.print(poppins_semibold_italic, 1079, 1638, nomorAnggota);
+    // Calculate text width
+    const namaLengkapWidth = Jimp.measureText(time_new_roman_bold, namaLengkap_print);
+    const nomorAnggotaWidth = Jimp.measureText(time_new_roman_bold, nomorAnggota_print);
 
-    const poppins_bold2 = await Jimp.loadFont('assets/font/fnt/poppins-bold1.fnt');
-    kd.print(poppins_bold2, 198, 1053, waktuValiditas);
+    // Calculate center position for namaLengkap
+    const namaLengkapX = Math.floor((kd.getWidth() - namaLengkapWidth) / 2);
+    const namaLengkapY = 1056; // Fixed y-coordinate for namaLengkap
 
+    // Calculate center position for nomorAnggota
+    const nomorAnggotaX = Math.floor((kd.getWidth() - nomorAnggotaWidth) / 2);
+    const nomorAnggotaY = 1111; // Fixed y-coordinate for nomorAnggota
+
+    // Print text in the center
+    kd.print(time_new_roman_bold, namaLengkapX, namaLengkapY, namaLengkap_print);
+    kd.print(time_new_roman_bold, nomorAnggotaX, nomorAnggotaY, nomorAnggota_print);
+    
     // masking image with shape background
     let member_photo = await Jimp.read(`uploads\\pasfoto\\${nomorAnggota}.png`);
-    member_photo = member_photo.resize(579.9, 745.9);
+    member_photo = member_photo.resize(516, 540);
     member_photo = await member_photo;
+    kd.composite(member_photo, 152, 511)
+
+    // masking image with shape rectangle
+    let rectangle = await Jimp.read(`assets/image/rectangle.png`);
+    rectangle = rectangle.resize(580, 3.24);
+    rectangle = await rectangle;
+    kd.composite(rectangle, 120, 1107)
 
     // Writing member photo in Firebase Storage
     const storageMemberPhotoRef = ref(storage, `memberPhoto/${nomorAnggota}.png`);
@@ -457,16 +596,12 @@ async function textOverlay(namaLengkap, nomorAnggota, waktuValiditas) {
     await uploadBytes(storageMemberPhotoRef, memberPhotoBuffer);
     // console.log("Member Photo uploaded successfully");
 
-    const mask = await Jimp.read('assets/image/mask.png');
-
-    let masked = member_photo.mask(mask, 0, 0);
-    masked = await masked;
-
-    kd.composite(masked, 195.8, 1255)
-
     // Writing image after processing
-    await kd.writeAsync(`output\\${nomorAnggota}.png`);
-    convertPNGtoPDF(`output\\${nomorAnggota}.png`, `output\\${nomorAnggota}.pdf`);
+    await kd.quality(quality).writeAsync(`${nomorAnggota}_depan.png`);
+    await kb.quality(quality).writeAsync(`${nomorAnggota}_belakang.png`);
+
+    convertPNGtoPDF(`${nomorAnggota}_depan.png`, `${nomorAnggota}_depan.pdf`);
+    convertPNGtoPDF(`${nomorAnggota}_belakang.png`, `${nomorAnggota}_belakang.pdf`);
 
     // Writing Membership Card image in Firebase Storage
     const storageMembershipCardRef = ref(storage, `membershipCard/${nomorAnggota}.png`);
